@@ -23,7 +23,6 @@ _testmain.go
 *.test
 *.prof
 
-accessParser
 
 # Ignore log files and json output
 *.log

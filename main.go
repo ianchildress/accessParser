@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -15,6 +16,10 @@ type LoggedRequest struct {
 }
 
 func main() {
+	// Setup some useful vars
+	totalLines := 0
+	badLines := 0 // Used to identify problem lines
+
 	// Fetch command line argument for file path
 	inFile := flag.String("in", "", "Path to the file for parsing.")
 	outFile := flag.String("out", "out.json", "Path to place the parsed json file.")
@@ -36,10 +41,14 @@ func main() {
 
 	// Iterate through the file line by line
 	scanner := bufio.NewScanner(file)
+
 	for scanner.Scan() {
+		totalLines++ // We start with line 1
 		logged, err := Parse(scanner.Text())
 		if err != nil {
-			log.Fatal(err)
+			badLine := fmt.Sprintf("Failed to parse line %v.\n%s\n", totalLines, scanner.Text())
+			badLines++
+			log.Println(badLine)
 		}
 		logBucket = append(logBucket, logged)
 	}
@@ -52,24 +61,42 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Printf("Successfully parsed file to %s", *outFile)
+	goodLines := totalLines - badLines
+	log.Printf("Successfully parsed %v lines and skipped %v bad lines to file %s.", goodLines, badLines, *outFile)
 
 }
 
 // Parse receives a string and pulls the ip address
 // and file path from the access log.
 func Parse(s string) (LoggedRequest, error) {
+	if len(s) == 0 {
+		return LoggedRequest{}, fmt.Errorf("Failed to parse line.")
+	}
 	// Get the ip address
 	a := strings.Split(s, " - - ")
+	if len(a) < 2 {
+		return LoggedRequest{}, fmt.Errorf("Failed to parse line.")
+	}
 
 	// Get the image url
 	b := strings.Split(s, `GET `)
+	if len(b) < 2 {
+		return LoggedRequest{}, fmt.Errorf("Failed to parse line.")
+	}
 	c := strings.Split(b[1], ` HTTP`)
+	if len(c) < 2 {
+		return LoggedRequest{}, fmt.Errorf("Failed to parse line.")
+	}
 
 	// Trim the whitespace and assign to logged
 	var logged LoggedRequest
 	logged.IpAddress = strings.TrimSpace(a[0])
 	logged.FileURL = strings.TrimSpace(c[0])
+
+	if logged.IpAddress == "" || logged.FileURL == "" {
+		return LoggedRequest{}, fmt.Errorf("Failed to parse line.")
+	}
+
 	return logged, nil
 }
 
